@@ -60,6 +60,7 @@ func Register(master string, me string) {
 func RunWorker(MasterAddress string, me string,
                MapFunc func(string) *list.List,
                ReduceFunc func(string,*list.List) string, nRPC int) {
+  
   DPrintf("RunWorker %s\n", me)
   wk := new(Worker)
   wk.name = me

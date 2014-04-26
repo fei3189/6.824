@@ -11,9 +11,9 @@ import "sort"
 import "strconv"
 
 const (
-  nNumber= 100000
-  nMap = 100
-  nReduce = 50
+  nNumber= 10000
+  nMap = 10
+  nReduce = 10
 )
 
 // Create input file with N numbers

@@ -2,6 +2,9 @@ package main
 
 import "os"
 import "fmt"
+import "strings"
+import "strconv"
+import "unicode"
 import "mapreduce"
 import "container/list"
 
@@ -9,11 +12,24 @@ import "container/list"
 // key to the Map function, as in the paper; only a value,
 // which is a part of the input file contents
 func Map(value string) *list.List {
+    vkey := strings.FieldsFunc(value, func (r rune) bool { return !unicode.IsLetter(r)})
+    ret := list.New()
+    for _, key := range vkey {
+        ret.PushBack(mapreduce.KeyValue{key, strconv.Itoa(1)})
+    }
+    return ret
 }
 
 // iterate over list and add values
 func Reduce(key string, values *list.List) string {
+    sum := 0
+    for e := values.Front(); e != nil; e = e.Next() {
+        v, _ := strconv.Atoi(e.Value.(string))
+        sum = sum + v
+    }
+    return strconv.Itoa(sum)
 }
+
 
 // Can be run in 3 ways:
 // 1) Sequential (e.g., go run wc.go master x.txt sequential)

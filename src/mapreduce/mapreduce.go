@@ -34,7 +34,7 @@ import "hash/fnv"
 // which Merge() merges into a single output.
 
 // Debugging
-const Debug = 0
+const Debug = 1
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
   if Debug > 0 {
@@ -64,6 +64,15 @@ type MapReduce struct {
   Workers map[string]*WorkerInfo 
 
   // add any additional state here
+  todoMap *list.List
+  todoReduce *list.List
+  workerList *list.List
+
+  waitToFinish chan bool
+
+  worker2state map[string]int
+
+  finished int
 }
 
 func InitMapReduce(nmap int, nreduce int,
@@ -76,8 +85,21 @@ func InitMapReduce(nmap int, nreduce int,
   mr.alive = true
   mr.registerChannel = make(chan string)
   mr.DoneChannel = make(chan bool)
+  mr.waitToFinish = make(chan bool, 1)
 
   // initialize any additional state here
+  mr.todoMap = list.New()
+  mr.todoReduce = list.New()
+  mr.workerList = list.New()
+  for i := 0; i < nmap; i += 1 {
+      mr.todoMap.PushBack(i)
+  }
+  for i := 0; i < nreduce; i += 1 {
+      mr.todoReduce.PushBack(i)
+  }
+
+  mr.finished = 0
+
   return mr
 }
 
@@ -91,7 +113,16 @@ func MakeMapReduce(nmap int, nreduce int,
 
 func (mr *MapReduce) Register(args *RegisterArgs, res *RegisterReply) error {
   DPrintf("Register: worker %s\n", args.Worker)
-  mr.registerChannel <- args.Worker
+  log.Printf("##")
+//  mr.registerChannel <- args.Worker
+  log.Printf("##")
+//  mr.stats.PushBack(0) // Not working
+  mr.waitToFinish <- true
+  mr.workerList.PushBack(WorkerInfo{args.Worker, 0})
+  <-mr.waitToFinish
+  log.Printf("##")
+  log.Printf(args.Worker)
+//  <- mr.registerChannel
   res.OK = true
   return nil
 }

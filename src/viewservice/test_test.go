@@ -54,6 +54,8 @@ func Test1(t *testing.T) {
 
   for i := 0; i < DeadPings * 2; i++ {
     view, _ := ck1.Ping(0)
+    fmt.Printf("JF %s\n", view.Primary);
+    fmt.Printf("JF %s\n", ck1.me);
     if view.Primary == ck1.me {
       break
     }
@@ -70,6 +72,8 @@ func Test1(t *testing.T) {
     for i := 0; i < DeadPings * 2; i++ {
       ck1.Ping(1)
       view, _ := ck2.Ping(0)
+      fmt.Printf("JF2 %s\n", view.Backup);
+      fmt.Printf("JF2 %s\n", ck1.me);
       if view.Backup == ck2.me {
         break
       }
