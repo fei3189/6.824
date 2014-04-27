@@ -3,6 +3,7 @@ package pbservice
 import "viewservice"
 import "net/rpc"
 import "fmt"
+import "time"
 
 // You'll probably need to uncomment these:
 // import "time"
@@ -14,6 +15,7 @@ import "fmt"
 type Clerk struct {
   vs *viewservice.Clerk
   // Your declarations here
+  kvs string
 }
 
 
@@ -21,7 +23,6 @@ func MakeClerk(vshost string, me string) *Clerk {
   ck := new(Clerk)
   ck.vs = viewservice.MakeClerk(me, vshost)
   // Your ck.* initializations here
-
   return ck
 }
 
@@ -59,6 +60,11 @@ func call(srv string, rpcname string,
   return false
 }
 
+func (ck *Clerk) Update() {
+  v,_ := ck.vs.Get()
+  ck.kvs = v.Primary
+}
+
 //
 // fetch a key's value from the current primary;
 // if they key has never been set, return "".
@@ -68,9 +74,35 @@ func call(srv string, rpcname string,
 //
 func (ck *Clerk) Get(key string) string {
 
-  // Your code here.
+  ok := true
+  if ck.kvs == "" {
+    ok = false
+  }
 
-  return "???"
+  serial := nrand()
+  var reply GetReply
+  for true {
+    if !ok {
+      ck.Update()
+//      fmt.Printf("Change server %s\n", ck.kvs)
+    }
+    args := &GetArgs{}
+    args.Key = key
+    args.Serial = serial
+    ok = call(ck.kvs, "PBServer.Get", args, &reply)
+    if !ok {
+//      fmt.Printf("wokao\n")
+      time.Sleep(viewservice.PingInterval)
+    } else {
+      if reply.Err == OK  {
+        break
+      } else {
+        ok = false
+        time.Sleep(viewservice.PingInterval)
+      }
+    }
+  }
+  return reply.Value
 }
 
 //
@@ -78,9 +110,40 @@ func (ck *Clerk) Get(key string) string {
 // must keep trying until it succeeds.
 //
 func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
+  ok := true
+  if ck.kvs == "" {
+    ok = false
+  }
+  serial := nrand()
+  var reply PutReply
+  for true {
+    if !ok {
+      ck.Update()
+//      fmt.Printf("Change server %s\n", ck.kvs)
+    }
 
-  // Your code here.
-  return "???"
+    args := &PutArgs{}
+    args.Key = key
+    args.Value = value
+    args.DoHash = dohash
+    args.From = FromClient
+    args.Serial = serial
+  
+    ok = call(ck.kvs, "PBServer.Put", args, &reply)
+//  fmt.Printf("XXX %s %d\n", reply.PreviousValue, reply.Serial)
+//      fmt.Printf("wokao1\n")
+    if !ok {
+      time.Sleep(viewservice.PingInterval)
+    } else {
+      if reply.Err == OK && reply.Serial == serial {
+        break
+      } else {
+        ok = false
+        time.Sleep(viewservice.PingInterval)
+      }
+    }
+  }
+  return reply.PreviousValue
 }
 
 func (ck *Clerk) Put(key string, value string) {

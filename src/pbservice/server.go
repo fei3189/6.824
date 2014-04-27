@@ -11,16 +11,23 @@ import "syscall"
 import "math/rand"
 import "sync"
 
-//import "strconv"
+import "strconv"
 
 // Debugging
-const Debug = 0
+const Debug = 1
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
   if Debug > 0 {
     n, err = fmt.Printf(format, a...)
   }
   return
+}
+type CopyArgs struct {
+  KV map[string]string
+  Serials map[int64]string
+}
+type CopyReply struct {
+  Err Err
 }
 
 type PBServer struct {
@@ -32,22 +39,123 @@ type PBServer struct {
   done sync.WaitGroup
   finish chan interface{}
   // Your declarations here.
+  view viewservice.View
+  kv map[string]string
+  serials map[int64]string
+
+  mu  sync.Mutex
+}
+
+func (pb *PBServer) Forward(args *PutArgs) int {
+  var reply PutReply
+  if pb.view.Backup != "" {
+    args.From = FromServer
+    ok := call(pb.view.Backup, "PBServer.Put", args, &reply)
+    if !ok {
+      return -1
+    }
+    if reply.Err != OK {
+      return -1
+    }
+  }
+  return 0
+}
+
+func (pb *PBServer) ForwardComplete(args *CopyArgs, reply *CopyReply) error {
+  pb.kv = args.KV
+  pb.serials = args.Serials
+  reply.Err = OK
+  fmt.Printf("*****%s copy database\n", pb.me)
+  return nil
 }
 
 func (pb *PBServer) Put(args *PutArgs, reply *PutReply) error {
+  pb.mu.Lock()
+  if pb.me != pb.view.Primary && args.From == FromClient {
+    reply.Err = ErrWrongServer
+    pb.mu.Unlock()
+    return nil
+  }
+  if pb.me == pb.view.Primary && args.From == FromServer {
+    reply.Err = ErrWrongServer
+    pb.mu.Unlock()
+    return nil
+  }
+  if _, ok := pb.serials[args.Serial]; ok {
+    reply.Err = OK
+    reply.Serial = args.Serial
+    reply.PreviousValue = pb.serials[args.Serial]
+    pb.mu.Unlock()
+    return nil
+  }
   // Your code here.
+  if args.DoHash {
+    if pb.me == pb.view.Primary && pb.Forward(args) != 0 {
+      reply.Err = ErrNonConsistent
+    pb.mu.Unlock()
+      return nil
+    }
+    val := pb.kv[args.Key]
+    next := val + args.Value
+    pb.kv[args.Key] = strconv.Itoa(int(hash(next)))
+    pb.serials[args.Serial] = val
+    reply.PreviousValue = val
+    reply.Err = OK
+    reply.Serial = args.Serial
+  } else {
+    if pb.me == pb.view.Primary && pb.Forward(args) != 0 {
+      reply.Err = ErrNonConsistent
+    pb.mu.Unlock()
+      return nil
+    }
+    pb.kv[args.Key] = args.Value
+    reply.Err = OK
+    reply.Serial = args.Serial
+    pb.serials[args.Serial] = ""
+  }
+    pb.mu.Unlock()
   return nil
 }
 
 func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
   // Your code here.
+  pb.mu.Lock()
+  if pb.me != pb.view.Primary {
+    reply.Err = ErrWrongServer
+    pb.mu.Unlock()
+    return nil
+  }
+  if _, ok := pb.serials[args.Serial]; ok {
+    reply.Err = OK
+    reply.Value = pb.serials[args.Serial]
+    pb.mu.Unlock()
+    return nil
+  }
+  reply.Value = pb.kv[args.Key]
+  reply.Err = OK
+  pb.serials[args.Serial] = reply.Value
+
+    pb.mu.Unlock()
   return nil
 }
 
 
 // ping the viewserver periodically.
 func (pb *PBServer) tick() {
-  // Your code here.
+  pb.mu.Lock()
+  // Your code here
+  v := pb.view
+  pb.view, _ = pb.vs.Ping(pb.view.Viewnum)
+  if v.Backup != pb.view.Backup && pb.view.Backup != "" && pb.me == pb.view.Primary {
+    args := &CopyArgs{}
+    reply := CopyReply{}
+    args.KV = pb.kv
+    args.Serials = pb.serials
+    fmt.Printf("######%s copy database\n", pb.me)
+    call(pb.view.Backup, "PBServer.ForwardComplete", args, &reply)
+  }
+    pb.mu.Unlock()
+//    DPrintf("tick! %s %d\n", pb.me, pb.view.Viewnum);
 }
 
 
@@ -65,7 +173,8 @@ func StartServer(vshost string, me string) *PBServer {
   pb.vs = viewservice.MakeClerk(me, vshost)
   pb.finish = make(chan interface{})
   // Your pb.* initializations here.
-
+  pb.kv = make(map[string]string)
+  pb.serials = make(map[int64]string)
   rpcs := rpc.NewServer()
   rpcs.Register(pb)
 
