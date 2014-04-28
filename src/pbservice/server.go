@@ -62,14 +62,20 @@ func (pb *PBServer) Forward(args *PutArgs) int {
 }
 
 func (pb *PBServer) ForwardComplete(args *CopyArgs, reply *CopyReply) error {
+  pb.mu.Lock()
   pb.kv = args.KV
   pb.serials = args.Serials
   reply.Err = OK
   fmt.Printf("*****%s copy database\n", pb.me)
+  pb.mu.Unlock()
   return nil
 }
 
 func (pb *PBServer) Put(args *PutArgs, reply *PutReply) error {
+  if pb.dead {
+    reply.Err = ErrDead
+    return nil
+  }
   pb.mu.Lock()
   if pb.me != pb.view.Primary && args.From == FromClient {
     reply.Err = ErrWrongServer
@@ -109,6 +115,7 @@ func (pb *PBServer) Put(args *PutArgs, reply *PutReply) error {
       return nil
     }
     pb.kv[args.Key] = args.Value
+//    fmt.Printf("KV size = %d\n", len(pb.kv))
     reply.Err = OK
     reply.Serial = args.Serial
     pb.serials[args.Serial] = ""
@@ -119,6 +126,10 @@ func (pb *PBServer) Put(args *PutArgs, reply *PutReply) error {
 
 func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
   // Your code here.
+  if pb.dead {
+    reply.Err = ErrDead
+    return nil
+  }
   pb.mu.Lock()
   if pb.me != pb.view.Primary {
     reply.Err = ErrWrongServer
@@ -152,7 +163,12 @@ func (pb *PBServer) tick() {
     args.KV = pb.kv
     args.Serials = pb.serials
     fmt.Printf("######%s copy database\n", pb.me)
-    call(pb.view.Backup, "PBServer.ForwardComplete", args, &reply)
+    for true {
+      ok := call(pb.view.Backup, "PBServer.ForwardComplete", args, &reply)
+      if ok {
+        break
+      }
+    }
   }
     pb.mu.Unlock()
 //    DPrintf("tick! %s %d\n", pb.me, pb.view.Viewnum);

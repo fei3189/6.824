@@ -82,7 +82,8 @@ func (ck *Clerk) Get(key string) string {
   serial := nrand()
   var reply GetReply
   for true {
-    if !ok {
+//    if !ok {
+    if true {
       ck.Update()
 //      fmt.Printf("Change server %s\n", ck.kvs)
     }
@@ -117,7 +118,8 @@ func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
   serial := nrand()
   var reply PutReply
   for true {
-    if !ok {
+//    if !ok {
+    if true {
       ck.Update()
 //      fmt.Printf("Change server %s\n", ck.kvs)
     }

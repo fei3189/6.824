@@ -9,6 +9,7 @@ const (
   ErrNoKey = "ErrNoKey"
   ErrWrongServer = "ErrWrongServer"
   ErrNonConsistent = "ErrNonConsistent"
+  ErrDead = "ErrDead"
   FromServer = 1
   FromClient = 2
 )
@@ -40,7 +41,6 @@ type GetArgs struct {
 type GetReply struct {
   Err Err
   Value string
-  Serial int64
 }
 
 func nrand() int64 {

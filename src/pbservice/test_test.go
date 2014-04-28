@@ -554,6 +554,7 @@ func TestRepeatedCrash(t *testing.T) {
         nv := strconv.Itoa(rr.Int())
         ck.Put(k, nv)
         data[k] = nv
+//        fmt.Printf("Map size = %d\n", len(data))
         // if no sleep here, then server tick() threads do not get 
         // enough time to Ping the viewserver.
         time.Sleep(10 * time.Millisecond)
