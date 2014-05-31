@@ -98,7 +98,7 @@ func (pb *PBServer) Put(args *PutArgs, reply *PutReply) error {
   if args.DoHash {
     if pb.me == pb.view.Primary && pb.Forward(args) != 0 {
       reply.Err = ErrNonConsistent
-    pb.mu.Unlock()
+      pb.mu.Unlock()
       return nil
     }
     val := pb.kv[args.Key]
@@ -157,7 +157,8 @@ func (pb *PBServer) tick() {
   // Your code here
   v := pb.view
   pb.view, _ = pb.vs.Ping(pb.view.Viewnum)
-  if v.Backup != pb.view.Backup && pb.view.Backup != "" && pb.me == pb.view.Primary {
+  if pb.view.Viewnum > v.Viewnum && pb.view.Backup != "" && pb.me == pb.view.Primary {
+//  if v.Backup != pb.view.Backup && pb.view.Backup != "" && pb.me == pb.view.Primary {
     args := &CopyArgs{}
     reply := CopyReply{}
     args.KV = pb.kv

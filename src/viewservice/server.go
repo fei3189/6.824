@@ -21,6 +21,8 @@ type ViewServer struct {
 
   hbTime map[string]time.Time
   viewNum map[string]uint
+
+  acked bool
 }
 
 //
@@ -31,29 +33,44 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
   // Your code here: 2013210880
   vs.mu.Lock()
   vs.hbTime[args.Me] = time.Now()
-  if vs.viewNum[args.Me] < args.Viewnum {
-    vs.viewNum[args.Me] = args.Viewnum
-  }
+//  if vs.viewNum[args.Me] < args.Viewnum {
+//    vs.viewNum[args.Me] = args.Viewnum
+//  }
   if args.Me == vs.current.Primary {
     if args.Viewnum == 0 {
       vs.next.Primary = vs.current.Backup
       vs.next.Backup = args.Me
       vs.next.Viewnum = vs.current.Viewnum + 1
     }
+    if vs.current.Viewnum == args.Viewnum {
+      vs.acked = true
+    }
   } else if args.Me == vs.current.Backup {
+    if args.Viewnum == 0 {
+      vs.next.Viewnum = vs.current.Viewnum + 1
+      vs.next.Primary = vs.current.Primary
+      vs.next.Backup = vs.current.Backup
+    }
     // Currently do nothing
   } else {
     if vs.current.Primary == "" {
       vs.next.Primary = args.Me
       vs.next.Viewnum = vs.current.Viewnum + 1
+      if vs.current.Viewnum == args.Viewnum {
+        vs.acked = true
+      }
     } else if vs.current.Backup == "" {
       vs.next.Backup = args.Me
       vs.next.Viewnum = vs.current.Viewnum + 1
     }
   }
 
-  if vs.viewNum[vs.current.Primary] == vs.current.Viewnum {
+//  if vs.viewNum[vs.current.Primary] == vs.current.Viewnum {
+//    vs.current = vs.next
+//  }
+  if vs.acked && vs.current != vs.next {
     vs.current = vs.next
+    vs.acked = false
   }
   reply.View = vs.current;
   vs.mu.Unlock()
@@ -79,7 +96,6 @@ func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 // accordingly.
 //
 func (vs *ViewServer) tick() {
-  
   // Your code here: 2013210880
   vs.mu.Lock()
   ti := time.Now()
@@ -99,6 +115,10 @@ func (vs *ViewServer) tick() {
   }
   if vs.next.Primary != vs.current.Primary || vs.next.Backup != vs.current.Backup {
     vs.next.Viewnum = vs.current.Viewnum + 1
+  }
+  if vs.acked && vs.current != vs.next {
+    vs.current = vs.next
+    vs.acked = false
   }
   vs.mu.Unlock()
 }
@@ -122,7 +142,7 @@ func StartServer(me string) *ViewServer {
   vs.next = View{}
   vs.hbTime = make(map[string]time.Time)
   vs.viewNum = make(map[string]uint)
-
+  vs.acked = true
   // tell net/rpc about our RPC server and handlers.
   rpcs := rpc.NewServer()
   rpcs.Register(vs)

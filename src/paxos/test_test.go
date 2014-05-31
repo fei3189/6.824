@@ -30,6 +30,7 @@ func ndecided(t *testing.T, pxa []*Paxos, seq int) int {
           t.Fatalf("decided values do not match; seq=%v i=%v v=%v v1=%v",
             seq, i, v, v1)
         }
+//        fmt.Println(i)
         count++
         v = v1
       }
@@ -598,18 +599,23 @@ func TestManyUnreliable(t *testing.T) {
     pxa[i].Start(0, 0)
   }
 
+  fmt.Println("####hehe####")
   const ninst = 50
   for seq := 1; seq < ninst; seq++ {
     // only 3 active instances, to limit the
     // number of file descriptors.
+    fmt.Println("##", seq)
     for seq >= 3 && ndecided(t, pxa, seq - 3) < npaxos {
       time.Sleep(20 * time.Millisecond)
+      fmt.Println(ndecided(t, pxa, seq - 3))
     }
+    fmt.Println("**", seq)
     for i := 0; i < npaxos; i++ {
       pxa[i].Start(seq, (seq * 10) + i)
     }
   }
 
+  fmt.Println("####hehe####")
   for {
     done := true
     for seq := 1; seq < ninst; seq++ {
