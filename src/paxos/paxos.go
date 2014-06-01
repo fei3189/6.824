@@ -211,7 +211,6 @@ func (px *Paxos) Decide(args *DecideArgs, rep *Reply) error {
     rep.OK = true
   } else {
     rep.OK = false
-    fmt.Println("oh no, there may be implementation errors")
   }
 /*  if state.done {
     rep.OK = true
@@ -397,6 +396,9 @@ func (px *Paxos) Done(seq int) {
         ok := call(px.peers[i], "Paxos.AskMin", a_args, a_rep)
         if ok && a_rep.Seq < cmin {
           cmin = a_rep.Seq
+        } else if !ok {
+          cmin = px.min
+          break
         }
       }
     }
@@ -478,15 +480,17 @@ func (px *Paxos) Status(seq int) (bool, interface{}) {
   // Your code here.
   px.mu.Lock()
   done := false
+  var value interface{} = nil
   if seq < px.min {
     done = false
   }
   state, ok := px.instances[seq]
   if ok && state.done {
     done = true
+    value = state.n_v
   }
   px.mu.Unlock()
-  return done, nil
+  return done, value
 }
 
 
