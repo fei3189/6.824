@@ -75,6 +75,7 @@ func TestBasic(t *testing.T) {
 
   check(t, cka[2], "a", "aaa")
   check(t, cka[1], "a", "aaa")
+
   check(t, ck, "a", "aaa")
 
   fmt.Printf("  ... Passed\n")

@@ -75,6 +75,13 @@ type AskMinReply struct {
   Seq int
 }
 
+type AskMaxArgs struct {
+}
+
+type AskMaxReply struct {
+  Seq int
+}
+
 type Paxos struct {
   mu sync.Mutex
   l net.Listener
@@ -128,11 +135,14 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 }
 
 func (px *Paxos) SyncMin(args *MinArgs, rep *Reply) error {
+//    fmt.Println("!!", px.me, args.Seq)
   if px.min < args.Seq {
+    px.mu.Lock()
     px.min = args.Seq
     if px.min > px.minLocal {
       px.minLocal = px.min
     }
+    px.mu.Unlock()
     px.DeleteExpired(px.min)
   }
   return nil
@@ -140,6 +150,12 @@ func (px *Paxos) SyncMin(args *MinArgs, rep *Reply) error {
 
 func (px *Paxos) AskMin(args *AskMinArgs, rep *AskMinReply) error {
   rep.Seq = px.minLocal
+//  fmt.Println("^^^^", px.me, rep.Seq)
+  return nil
+}
+
+func (px *Paxos) AskMax(args *AskMaxArgs, rep *AskMaxReply) error {
+  rep.Seq = px.max
   return nil
 }
 
@@ -166,7 +182,6 @@ func (px *Paxos) Prepare(args *PrepareArgs, rep *PrepareReply) error {
   rep.HighestValue = state.n_v
   rep.Max = state.n_p
   px.mu.Unlock()
-//  fmt.Println(px.me, " prepare ", rep.OK, " ", args.Number)
   return nil
 }
 
@@ -212,18 +227,7 @@ func (px *Paxos) Decide(args *DecideArgs, rep *Reply) error {
   } else {
     rep.OK = false
   }
-/*  if state.done {
-    rep.OK = true
-  } else if state.n_v == args.Value {
-    state.done = true
-    rep.OK = true
-  } else {
-    state.done = true
-    state.n_v = args.Value
-    rep.OK = true
-  } */
   px.mu.Unlock()
-//  fmt.Println(px.me, " decide ", state.done)
   return nil
 }
 
@@ -364,6 +368,7 @@ func (px *Paxos) Propose(seq int, v interface{}) {
 //
 func (px *Paxos) Start(seq int, v interface{}) {
   // Your code here.
+//  fmt.Println(px.Min())
   px.mu.Lock()
   if seq < px.min {
     px.mu.Unlock()
@@ -385,15 +390,18 @@ func (px *Paxos) Start(seq int, v interface{}) {
 func (px *Paxos) Done(seq int) {
   // Your code here.
   if seq >= px.minLocal {
+    px.mu.Lock()
     px.minLocal = seq + 1
+    px.mu.Unlock()
 
     //Gathering min value
     cmin := px.minLocal
-    a_args := &AskMinArgs{}
-    a_rep := &AskMinReply{}
     for i := 0; i < len(px.peers); i++ {
       if i != px.me {
+        a_args := &AskMinArgs{}
+        a_rep := &AskMinReply{}
         ok := call(px.peers[i], "Paxos.AskMin", a_args, a_rep)
+//        fmt.Println("$$$$", ok, a_rep.Seq)
         if ok && a_rep.Seq < cmin {
           cmin = a_rep.Seq
         } else if !ok {
@@ -402,13 +410,17 @@ func (px *Paxos) Done(seq int) {
         }
       }
     }
+//    fmt.Println("&&&&&", cmin, px.min, "&&&&&&&&&&&&&")
     if cmin > px.min {
+      px.mu.Lock()
       px.min = cmin
+      px.mu.Unlock()
       px.DeleteExpired(cmin)
     }
     //Sync min value
     args := &MinArgs{cmin}
     rep := &Reply{}
+//    fmt.Println("!! SEND", px.me, cmin)
     for i := 0; i < len(px.peers); i++ {
       if i != px.me {
         call(px.peers[i], "Paxos.SyncMin", args, rep)
@@ -433,6 +445,22 @@ func (px *Paxos) DeleteExpired(seq int) {
 //
 func (px *Paxos) Max() int {
   // Your code here.
+  cmax := px.max
+  a_args := &AskMaxArgs{}
+  a_rep := &AskMaxReply{}
+  for i := 0; i < len(px.peers); i++ {
+    if i != px.me {
+      ok := call(px.peers[i], "Paxos.AskMax", a_args, a_rep)
+      if ok && a_rep.Seq > cmax {
+        cmax = a_rep.Seq
+      }
+    }
+  }
+  if cmax > px.max {
+    px.mu.Lock()
+    px.max = cmax
+    px.mu.Unlock()
+  }
   return px.max
 }
 
@@ -466,6 +494,26 @@ func (px *Paxos) Max() int {
 // 
 func (px *Paxos) Min() int {
   // You code here.
+  a_args := &AskMinArgs{}
+  a_rep := &AskMinReply{}
+  cmin := px.minLocal
+//  fmt.Println("&&&&&", cmin, px.min, "&&&&&&&&&&&&&")
+  for i := 0; i < len(px.peers); i++ {
+    if i != px.me {
+      ok := call(px.peers[i], "Paxos.AskMin", a_args, a_rep)
+      if ok && a_rep.Seq < cmin {
+        cmin = a_rep.Seq
+      } else if !ok {
+        cmin = px.min
+        break
+      }
+    }
+  }
+  if cmin > px.min {
+    px.mu.Lock()
+    px.min = cmin
+    px.mu.Unlock()
+  }
   return px.min
 }
 
