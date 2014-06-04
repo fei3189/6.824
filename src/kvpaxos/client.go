@@ -67,7 +67,7 @@ func (ck *Clerk) Get(key string) string {
 //          fmt.Println("CLIENT:", args.Serial, reply.Value)
       ok := call(servername, "KVPaxos.Get", args, reply)
       if ok {
-//        fmt.Println("CLIENT : ok", reply.Value, reply.Err)
+//        fmt.Println("CLIENT : ok", reply.Value, args.Serial, reply.Err)
         if reply.Err == "OK" {
           ck.active = i % len(ck.servers)
 //          fmt.Println("CLIENT:", args.Serial, reply.Value)

@@ -160,6 +160,10 @@ func TestDone(t *testing.T) {
     }
   }
 
+  runtime.GC()
+  var m2 runtime.MemStats
+  runtime.ReadMemStats(&m2)
+  fmt.Println("&&&", "string inserted", m2.Alloc)
   // Put and Get to each of the replicas, in case
   // the Done information is piggybacked on
   // the Paxos proposer messages.

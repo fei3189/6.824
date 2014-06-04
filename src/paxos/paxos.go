@@ -29,6 +29,7 @@ import "sync"
 import "fmt"
 import "math/rand"
 import "time"
+//import "runtime"
 
 type State struct {
   n_p int
@@ -228,6 +229,7 @@ func (px *Paxos) Decide(args *DecideArgs, rep *Reply) error {
     rep.OK = false
   }
   px.mu.Unlock()
+  fmt.Println(px.me, "decide", rep.OK, args.Seq)
   return nil
 }
 
@@ -389,6 +391,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 //
 func (px *Paxos) Done(seq int) {
   // Your code here.
+  fmt.Println("##", px.me, seq)
   if seq >= px.minLocal {
     px.mu.Lock()
     px.minLocal = seq + 1
@@ -416,16 +419,16 @@ func (px *Paxos) Done(seq int) {
       px.min = cmin
       px.mu.Unlock()
       px.DeleteExpired(cmin)
+      args := &MinArgs{cmin}
+      rep := &Reply{}
+//    fmt.Println("!! SEND", px.me, cmin)
+      for i := 0; i < len(px.peers); i++ {
+        if i != px.me {
+          call(px.peers[i], "Paxos.SyncMin", args, rep)
+        }
+      } 
     }
     //Sync min value
-    args := &MinArgs{cmin}
-    rep := &Reply{}
-//    fmt.Println("!! SEND", px.me, cmin)
-    for i := 0; i < len(px.peers); i++ {
-      if i != px.me {
-        call(px.peers[i], "Paxos.SyncMin", args, rep)
-      }
-    }
   }
 }
 
@@ -494,7 +497,7 @@ func (px *Paxos) Max() int {
 // 
 func (px *Paxos) Min() int {
   // You code here.
-  a_args := &AskMinArgs{}
+/*  a_args := &AskMinArgs{}
   a_rep := &AskMinReply{}
   cmin := px.minLocal
 //  fmt.Println("&&&&&", cmin, px.min, "&&&&&&&&&&&&&")
@@ -513,7 +516,7 @@ func (px *Paxos) Min() int {
     px.mu.Lock()
     px.min = cmin
     px.mu.Unlock()
-  }
+  } */
   return px.min
 }
 
@@ -531,6 +534,7 @@ func (px *Paxos) Status(seq int) (bool, interface{}) {
   var value interface{} = nil
   if seq < px.min {
     done = false
+    fmt.Println(px.me, seq, px.min)
   }
   state, ok := px.instances[seq]
   if ok && state.done {
