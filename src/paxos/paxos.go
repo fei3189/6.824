@@ -136,7 +136,6 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 }
 
 func (px *Paxos) SyncMin(args *MinArgs, rep *Reply) error {
-//    fmt.Println("!!", px.me, args.Seq)
   if px.min < args.Seq {
     px.mu.Lock()
     px.min = args.Seq
@@ -151,7 +150,6 @@ func (px *Paxos) SyncMin(args *MinArgs, rep *Reply) error {
 
 func (px *Paxos) AskMin(args *AskMinArgs, rep *AskMinReply) error {
   rep.Seq = px.minLocal
-//  fmt.Println("^^^^", px.me, rep.Seq)
   return nil
 }
 
@@ -194,11 +192,6 @@ func (px *Paxos) Accept(args *AcceptArgs, rep *Reply) error {
   state, ok := px.instances[args.Seq]
   if ok {
     if args.Number >= state.n_p {
-/*      if state.done && state.n_v != args.Value {
-        for true {
-          fmt.Println("diff value")
-        }
-      }  */
       state.n_a = args.Number
       state.n_v = args.Value
       rep.OK = true
@@ -229,7 +222,6 @@ func (px *Paxos) Decide(args *DecideArgs, rep *Reply) error {
     rep.OK = false
   }
   px.mu.Unlock()
-  fmt.Println(px.me, "decide", rep.OK, args.Seq)
   return nil
 }
 
@@ -307,9 +299,6 @@ func (px *Paxos) SendDecide(seq int, majority []int, value interface{}) (count i
       args := &DecideArgs{seq, value}
       rep := &Reply{}
       if i == px.me {
-  /*      if px.me == 0 {
-          fmt.Println("##", seq)
-        }*/
         px.Decide(args, rep)
         if rep.OK {
           count++
@@ -330,13 +319,6 @@ func (px *Paxos) Propose(seq int, v interface{}) {
   for seq >= px.min {
     number = number + step
     majority, count, highest_n, max_s, highest_v := px.PreparePhase(seq, number)
-/*    if px.me == 0 && seq == 1 {
-      fmt.Println(count, " ", majority[0], highest_n, number, px.max)
-      for key, value := range(px.instances) {
-        fmt.Print(key, " ", value.done, " ")
-      } 
-      fmt.Println()
-    } */
     if count * 2 < len(px.peers) {
       bigger := (max_s / len(px.peers) + 100) * len(px.peers) + step
       if bigger > number {
@@ -370,7 +352,6 @@ func (px *Paxos) Propose(seq int, v interface{}) {
 //
 func (px *Paxos) Start(seq int, v interface{}) {
   // Your code here.
-//  fmt.Println(px.Min())
   px.mu.Lock()
   if seq < px.min {
     px.mu.Unlock()
@@ -391,7 +372,6 @@ func (px *Paxos) Start(seq int, v interface{}) {
 //
 func (px *Paxos) Done(seq int) {
   // Your code here.
-  fmt.Println("##", px.me, seq)
   if seq >= px.minLocal {
     px.mu.Lock()
     px.minLocal = seq + 1
@@ -404,7 +384,6 @@ func (px *Paxos) Done(seq int) {
         a_args := &AskMinArgs{}
         a_rep := &AskMinReply{}
         ok := call(px.peers[i], "Paxos.AskMin", a_args, a_rep)
-//        fmt.Println("$$$$", ok, a_rep.Seq)
         if ok && a_rep.Seq < cmin {
           cmin = a_rep.Seq
         } else if !ok {
@@ -413,7 +392,6 @@ func (px *Paxos) Done(seq int) {
         }
       }
     }
-//    fmt.Println("&&&&&", cmin, px.min, "&&&&&&&&&&&&&")
     if cmin > px.min {
       px.mu.Lock()
       px.min = cmin
@@ -421,7 +399,6 @@ func (px *Paxos) Done(seq int) {
       px.DeleteExpired(cmin)
       args := &MinArgs{cmin}
       rep := &Reply{}
-//    fmt.Println("!! SEND", px.me, cmin)
       for i := 0; i < len(px.peers); i++ {
         if i != px.me {
           call(px.peers[i], "Paxos.SyncMin", args, rep)
@@ -497,26 +474,6 @@ func (px *Paxos) Max() int {
 // 
 func (px *Paxos) Min() int {
   // You code here.
-/*  a_args := &AskMinArgs{}
-  a_rep := &AskMinReply{}
-  cmin := px.minLocal
-//  fmt.Println("&&&&&", cmin, px.min, "&&&&&&&&&&&&&")
-  for i := 0; i < len(px.peers); i++ {
-    if i != px.me {
-      ok := call(px.peers[i], "Paxos.AskMin", a_args, a_rep)
-      if ok && a_rep.Seq < cmin {
-        cmin = a_rep.Seq
-      } else if !ok {
-        cmin = px.min
-        break
-      }
-    }
-  }
-  if cmin > px.min {
-    px.mu.Lock()
-    px.min = cmin
-    px.mu.Unlock()
-  } */
   return px.min
 }
 
@@ -534,7 +491,6 @@ func (px *Paxos) Status(seq int) (bool, interface{}) {
   var value interface{} = nil
   if seq < px.min {
     done = false
-    fmt.Println(px.me, seq, px.min)
   }
   state, ok := px.instances[seq]
   if ok && state.done {

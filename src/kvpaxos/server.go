@@ -59,7 +59,6 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
     if seq < tmp {
       seq = tmp
     }
-//  fmt.Println("Run get", kv.me, seq)
     op := makeGetOp(args)
     kv.px.Start(seq, op)
     agreedOp := kv.waitPaxos(seq)
@@ -69,14 +68,11 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
       return nil
     } else if op == agreedOp {
       res, ok := kv.runLog(seq)
-//      fmt.Println("### ", tryTimes, ok)
       if ok != "OK" {
         reply.Err = "network error1234"
-//        fmt.Println(tryTimes, "op != agree")
       } else {
         reply.Value = res
         reply.Err = "OK"
-//        fmt.Println(tryTimes, "op == agree")
       }
       kv.mu.Unlock()
       return nil
@@ -139,44 +135,24 @@ func (kv *KVPaxos) runOp(op Op) (ret string) {
       if !ok {
         ret = ""
       }
-//      kv.serials[op.Serial] = kv.kv[op.Key]
     case "PUTHASH":
       ret, ok = kv.kv[op.Key]
       if !ok {
         ret = ""
       }
-      fmt.Println("^^", op.Key, kv.me, ret)
       kv.serials[op.Serial] = ret
       next := ret + op.Value
       kv.kv[op.Key] = strconv.Itoa(int(hash(next)))
-//      fmt.Println("@@@@", ret)
     default:
-//      fmt.Println("wowo")
       ret = ""
-  }
-//  fmt.Println(kv.me, op.Serial, op.Operation, op.Key, op.Value, ret)
-  if op.Operation == "PUTHASH" {
-    fmt.Println("##", op.Key, op.Operation, op.Serial, ret, kv.me)
   }
   return ret
 }
 
-/*
-func (kv *KVPaxos) runLogThread() {
-  for true {
-    kv.mu.Lock()
-    kv.runLog(kv.px.Max())
-    kv.mu.Unlock()
-    time.Sleep(100 * time.Millisecond)
-  }
-} */
 
 func (kv *KVPaxos) runLog(max int) (ret string, err string) {
-//  ret = ""
-  fmt.Println("$", kv.me, kv.min)
   for ; kv.min <= max; kv.min++ {
     decided, value := kv.px.Status(kv.min)
-    fmt.Println(kv.me, kv.min, decided)
     if decided {
       ret = kv.runOp(value.(Op))
     } else {
@@ -189,16 +165,12 @@ func (kv *KVPaxos) runLog(max int) (ret string, err string) {
         ret = kv.runOp(op)
       }
     }
-//    fmt.Println("$", ret, kv.min)
   }
   kv.px.Done(kv.min - 1)
-  fmt.Println("$", kv.me, kv.min, kv.px.Min())
-//  fmt.Println("###", ret, kv.min, max)
   return ret, "OK"
 }
 
 func (kv *KVPaxos) Put(args *PutArgs, reply *PutReply) error {
-//  fmt.Println("Run put", kv.me)
   kv.mu.Lock()
   // Your code here.
   tryTimes := 5

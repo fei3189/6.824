@@ -58,19 +58,15 @@ func call(srv string, rpcname string,
 //
 func (ck *Clerk) Get(key string) string {
   // You will have to modify this function.
-//  fmt.Println("Client Get")
   args := &GetArgs{key, nrand()}
       reply := &GetReply{}
   for true {
     for i := ck.active; i < ck.active + len(ck.servers); i++ {
       servername := ck.servers[i % len(ck.servers)]
-//          fmt.Println("CLIENT:", args.Serial, reply.Value)
       ok := call(servername, "KVPaxos.Get", args, reply)
       if ok {
-//        fmt.Println("CLIENT : ok", reply.Value, args.Serial, reply.Err)
         if reply.Err == "OK" {
           ck.active = i % len(ck.servers)
-//          fmt.Println("CLIENT:", args.Serial, reply.Value)
           return reply.Value
         }
       }
@@ -84,7 +80,6 @@ func (ck *Clerk) Get(key string) string {
 // keeps trying until it succeeds.
 //
 func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
-//  fmt.Println("Client Put")
   // You will have to modify this function.
   args := &PutArgs{key, value, dohash, nrand()}
   reply := &PutReply{}
