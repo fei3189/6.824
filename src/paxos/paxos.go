@@ -215,12 +215,14 @@ func (px *Paxos) Decide(args *DecideArgs, rep *Reply) error {
     px.mu.Unlock()
     return nil
   }
-  if state.n_v == args.Value {
+  state.done = true
+  rep.OK = true
+/*  if state.n_v == args.Value {
     state.done = true
     rep.OK = true
   } else {
     rep.OK = false
-  }
+  } */
   px.mu.Unlock()
   return nil
 }

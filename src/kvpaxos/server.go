@@ -123,7 +123,6 @@ func (kv *KVPaxos) runOp(op Op) (ret string) {
   ret = ""
   v, ok := kv.serials[op.Serial]
   if ok {
-//  if ok && (op.Operation == "PUT" || op.Operation == "PUTHASH") {
     return v
   }
   switch op.Operation {
