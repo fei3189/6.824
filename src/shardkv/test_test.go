@@ -299,7 +299,7 @@ func doConcurrent(t *testing.T, unreliable bool) {
 
         mymck.Move(rand.Int() % shardmaster.NShards,
           gids[rand.Int() % len(gids)])
-
+        fmt.Println(npara, iters)
         time.Sleep(time.Duration(rand.Int() % 30) * time.Millisecond)
       }
     }(i)
@@ -313,7 +313,7 @@ func doConcurrent(t *testing.T, unreliable bool) {
   }
 }
 
-func TestConcurrent(t *testing.T) {
+func TestConcurrent1(t *testing.T) {
   fmt.Printf("Test: Concurrent Put/Get/Move ...\n")
   doConcurrent(t, false)
   fmt.Printf("  ... Passed\n")
