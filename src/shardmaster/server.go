@@ -373,7 +373,9 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) error {
   // Your code here.
   op := sm.makeOp("QUERY", *args)
   ret, err := sm.process(op)
-  reply.Config = ret.(Config)
+  if err == nil {
+    reply.Config = ret.(Config)
+  }
   return err
 }
 

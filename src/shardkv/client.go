@@ -79,6 +79,7 @@ func (ck *Clerk) Get(key string) string {
   defer ck.mu.Unlock()
 
   // You'll have to modify Get().
+  serial := nrand()
 
   for {
     shard := key2shard(key)
@@ -92,6 +93,8 @@ func (ck *Clerk) Get(key string) string {
       for _, srv := range servers {
         args := &GetArgs{}
         args.Key = key
+        args.Serial = serial
+        args.Shard = shard
         var reply GetReply
         ok := call(srv, "ShardKV.Get", args, &reply)
         if ok && (reply.Err == OK || reply.Err == ErrNoKey) {
@@ -116,6 +119,7 @@ func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
   defer ck.mu.Unlock()
 
   // You'll have to modify Put().
+  serial := nrand()
 
   for {
     shard := key2shard(key)
@@ -131,6 +135,8 @@ func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
         args.Key = key
         args.Value = value
         args.DoHash = dohash
+        args.Serial = serial
+        args.Shard = shard
         var reply PutReply
         ok := call(srv, "ShardKV.Put", args, &reply)
         if ok && reply.Err == OK {
