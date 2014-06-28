@@ -82,6 +82,7 @@ func (ck *Clerk) Get(key string) string {
   serial := nrand()
 
   for {
+    ck.config = ck.sm.Query(-1)
     shard := key2shard(key)
 
     gid := ck.config.Shards[shard]
@@ -122,6 +123,7 @@ func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
   serial := nrand()
 
   for {
+    ck.config = ck.sm.Query(-1)
     shard := key2shard(key)
 
     gid := ck.config.Shards[shard]

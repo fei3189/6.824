@@ -26,6 +26,7 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 
 type KVRequest struct {
   Shard int
+  maxView int
 }
 
 type KVReply struct {
@@ -71,7 +72,7 @@ type ShardKV struct {
   serials map[int64]string
   config shardmaster.Config
   min int
-
+  maxView int
   muKV sync.Mutex
 }
 
@@ -113,21 +114,22 @@ func (kv *ShardKV) PutShard(args *ReconfArgs, reply *ReconfReply) error {
 func (kv *ShardKV) GetShard(args *KVRequest, reply *KVReply) error {
 //  kv.mu.Lock()
 //  fmt.Println("Getshard start")
-  defer func() {
-//      kv.mu.Unlock()
-//      fmt.Println("Getshard")
-  }()
-  kv.process(Op{"NOOP", "", 0})
 //  kv.runLog(kv.px.Max())
-  shard := make(map[string]string)
-  for key, value := range(kv.kv) {
-    if kv.shards[key] == args.Shard {
-      shard[key] = value
+  if kv.maxView >= args.maxView {
+    shard := make(map[string]string)
+    kv.muKV.Lock()
+    for key, value := range(kv.kv) {
+      if kv.shards[key] == args.Shard {
+        shard[key] = value
+      }
     }
-  }
-  reply.KVMap = shard
+    kv.muKV.Unlock()
+    reply.KVMap = shard
 //  kv.mu.Unlock()
-  return nil
+    return nil
+  } else {
+    return errors.New("Please visit me later")
+  }
 }
 
 func (kv *ShardKV) runOp(op Op) interface{} {
@@ -143,10 +145,12 @@ func (kv *ShardKV) runOp(op Op) interface{} {
       kv.serials[op.Serial] = ""
       kv.shards[args.Key] = args.Shard
       kv.muKV.Unlock()
+      fmt.Println("PUT", kv.gid, "[" + args.Key + ":", args.Value)
       return ""
     case "GET":
       args := op.Args.(GetArgs)
       v, ok = kv.kv[args.Key]
+      fmt.Println("GET", kv.gid, "[" + args.Key + ":", v)
       return v
     case "PUTHASH":
       kv.muKV.Lock()
@@ -157,10 +161,16 @@ func (kv *ShardKV) runOp(op Op) interface{} {
       kv.kv[args.Key] = strconv.Itoa(int(hash(next)))
       kv.shards[args.Key] = args.Shard
       kv.muKV.Unlock()
+      fmt.Println("HASH", kv.gid, "[" + args.Key + ":", int(hash(next)), v)
       return v
     case "RECONF":
       newConfig := op.Args.(shardmaster.Config)
-      for i := 0; i < len(kv.config.Shards); i++ {
+//      prevConfig := kv.sm.Query(newConfig.Num - 1)
+//    fmt.Println("@@", newConfig.Num, prevConfig.Num, kv.config.Num)
+//      if prevConfig.Num > kv.config.Num {
+//        kv.config = prevConfig
+//    }
+/*      for i := 0; i < len(kv.config.Shards); i++ {
         if kv.config.Shards[i] == kv.gid && newConfig.Shards[i] != kv.gid && newConfig.Shards[i] != 0 {
           args := ReconfArgs{i, make(map[string]string)}
           reply := ReconfReply{}
@@ -179,10 +189,16 @@ func (kv *ShardKV) runOp(op Op) interface{} {
           }
         }
       }
-/*
-for i := 0; i < len(kv.config.Shards); i++ {
+*/
+      fmt.Println("@ GID", kv.gid, kv.config.Shards)
+      kv.maxView = newConfig.Num
+      succeed := false
+      for !succeed {
+      for i := 0; i < len(kv.config.Shards); i++ {
+        succeed = true
         if kv.config.Shards[i] != kv.gid && newConfig.Shards[i] == kv.gid && kv.config.Shards[i] != 0 {
-          args := KVRequest{i}
+          succeed = false
+          args := KVRequest{i, kv.maxView}
           reply := KVReply{}
           servers := kv.config.Groups[kv.config.Shards[i]]
           for j := 0; j < len(servers); j++ {
@@ -192,15 +208,18 @@ for i := 0; i < len(kv.config.Shards); i++ {
                 kv.kv[key] = value
                 kv.shards[key] = i
               }
+              fmt.Println("MOVE", i, kv.maxView, kv.gid, kv.config.Shards[i], reply.KVMap)
+              succeed = true
               break
             } else {
             }
           }
         }
       }
-      */
+      }
       kv.serials[op.Serial] = ""
       kv.config = newConfig
+      fmt.Println("# GID", kv.gid, kv.config.Shards)
       return ""
     case "NOOP":
       return ""
@@ -215,6 +234,11 @@ func (kv *ShardKV) runLog(max int) (ret interface{}, err error) {
   ret = ""
   for ; kv.min <= max; kv.min++ {
     decided, value := kv.px.Status(kv.min)
+    if value.(Op).Operation == "PUT" && kv.config.Shards[value.(Op).Args.(PutArgs).Shard] != kv.gid  || value.(Op).Operation == "GET" && kv.config.Shards[value.(Op).Args.(GetArgs).Shard] != kv.gid || value.(Op).Operation == "PUTHASH" && kv.config.Shards[value.(Op).Args.(PutArgs).Shard] != kv.gid {
+        ret = "error"
+        err = errors.New("Network error")
+        break
+    }
     if decided {
       ret = kv.runOp(value.(Op))
     } else {
@@ -376,6 +400,7 @@ func StartServer(gid int64, shardmasters []string,
   kv.serials = make(map[int64]string)
   kv.config = kv.sm.Query(-1)
   kv.min = 0
+  kv.maxView = 0
 
   rpcs := rpc.NewServer()
   rpcs.Register(kv)
