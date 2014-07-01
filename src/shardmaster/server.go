@@ -191,51 +191,6 @@ func (sm *ShardMaster) oneToAll(config Config, gid int64) Config {
   }
   return config
 }
-/*
-  if len(config.Groups) == 0 {
-    for i := 0; i < len(config.Shards); i++ {
-      config.Shards[i] = 0
-    }
-    return config
-  }
-  preAvg := NShards / (len(config.Groups) + 1)
-  for i := 0; i < len(config.Shards); i++ {
-    if config.Shards[i] != gid {
-      current[config.Shards[i]]++
-    }
-  }
-  
-  if len(current) == 0 {
-    return config
-  }
-  pos := 0
-  for key, value := range(current) {
-    if value == preAvg {
-      for pos < len(config.Shards) {
-        if config.Shards[pos] == gid {
-          config.Shards[pos] = key
-          pos++
-          break
-        }
-        pos++
-      }
-    }
-  }
-  for pos < len(config.Shards) {
-    for key, _ := range(current) {
-      for pos < len(config.Shards) {
-        if config.Shards[pos] == gid {
-          config.Shards[pos] = key
-          pos++
-          break
-        }
-        pos++
-      }
-    }
-  }
-  return config
-}
-*/
 
 func (sm *ShardMaster) runOp(op Op) interface{} {
   switch op.Operation {

@@ -95,7 +95,8 @@ func (ck *Clerk) Get(key string) string {
         args := &GetArgs{}
         args.Key = key
         args.Serial = serial
-        args.Shard = shard
+        args.ViewNum = ck.config.Num
+        args.Shard = key2shard(args.Key)
         var reply GetReply
         ok := call(srv, "ShardKV.Get", args, &reply)
         if ok && (reply.Err == OK || reply.Err == ErrNoKey) {
@@ -138,7 +139,8 @@ func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
         args.Value = value
         args.DoHash = dohash
         args.Serial = serial
-        args.Shard = shard
+        args.Shard = key2shard(args.Key)
+        args.ViewNum = ck.config.Num
         var reply PutReply
         ok := call(srv, "ShardKV.Put", args, &reply)
         if ok && reply.Err == OK {

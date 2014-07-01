@@ -26,6 +26,7 @@ type PutArgs struct {
   // You'll have to add definitions here.
   // Field names must start with capital letters,
   // otherwise RPC will break.
+  ViewNum int
   Shard int
   Serial int64
 }
@@ -38,6 +39,7 @@ type PutReply struct {
 type GetArgs struct {
   Key string
   // You'll have to add definitions here.
+  ViewNum int
   Shard int
   Serial int64
 }
